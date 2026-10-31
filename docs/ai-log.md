@@ -11,6 +11,6 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 - **What was wrong (or "nothing"):**A stray s in sorting.js and a stray S plus a duplicated chunk in the test file after copying. Running the code and npm test caught them. The AI said package.json already had a test script, which was wrong. There is no unpublish function.
 
 ### Prompt 2:
-- **What I asked:**ss
+- **What I asked:**
 - **What came back:**
 - **What was wrong (or "nothing"):**
