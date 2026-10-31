@@ -153,4 +153,32 @@ export function offerNextOnWaitlist(store, tierId) {
   const head = queue.peek();
   if (!head || seatsLeft(tier) < head.quantity) return undefined;
   return queue.dequeue();
+}export function publishEvent(store, eventId) {
+  const event = store.events.get(eventId);
+  if (!event) throw new DomainError('NOT_FOUND', 'Event not found');
+  if (event.tierIds.length === 0) {
+    throw new DomainError('INVALID_STATE', 'An event needs at least one ticket tier to be published');
+  }
+  event.status = 'published';
+  return event;
+}
+
+export function listEventSummaries(store, { publishedOnly = true } = {}) {
+  const summaries = [];
+  for (const event of store.events.values()) {
+    if (publishedOnly && event.status !== 'published') continue;
+    const tiers = event.tierIds.map((id) => store.tiers.get(id));
+    const prices = tiers.map((tier) => tier.priceCents);
+    summaries.push({
+      id: event.id,
+      title: event.title,
+      city: event.city,
+      venue: event.venue,
+      startsAt: event.startsAt,
+      status: event.status,
+      cheapestPriceCents: prices.length > 0 ? Math.min(...prices) : null,
+      seatsLeft: tiers.reduce((total, tier) => total + seatsLeft(tier), 0),
+    });
+  }
+  return summaries;
 }
