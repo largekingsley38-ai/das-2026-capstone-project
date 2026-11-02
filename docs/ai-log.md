@@ -14,3 +14,9 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 - **What I asked:**
 - **What came back:**
 - **What was wrong (or "nothing"):**
+
+## Build 3
+### Prompt 1: Build 3 prompt (docs/build-3.md)
+- **What I asked:** state machine, router, server, config, tests and architecture diagrams.
+- **What came back:** code sent in pieces. 34 tests passing.
+- **What was wrong (or "nothing"):** the duplicated chunk happened again in app.js, so I replaced the whole file. The AI added a BAD_JSON error code the prompt did not name. Bad JSON is not tested with a real POST because there is no POST route yet.
