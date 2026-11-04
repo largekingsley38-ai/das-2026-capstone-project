@@ -5,7 +5,15 @@ import path from 'node:path';
 
 import { DomainError } from '../domain/errors.js';
 import { createRouter } from './router.js';
+import { registerApiRoutes } from './apiRoutes.js';
+import { createMemoryRepository } from '../repositories/memory.js';
+import { createMockPaymentGateway } from '../lib/mockPaymentGateway.js';
+import { createEventService } from '../services/eventService.js';
+import { createBookingService } from '../services/bookingService.js';
 import { config } from '../config.js';
+
+// Kept here so older imports of readJsonBody still work.
+export { readJsonBody } from './body.js';
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -17,7 +25,7 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
-// Every error leaves the server in this one shape.
+// Every error leaves the server in this one shape: { error: { code, message } }
 function sendJson(res, status, body) {
   const text = JSON.stringify(body);
   res.writeHead(status, {
@@ -34,23 +42,15 @@ function sendError(res, status, code, message) {
 // One place that turns a DomainError code into an HTTP status.
 const STATUS_BY_CODE = {
   VALIDATION: 400,
+  BAD_JSON: 400,
+  UNAUTHENTICATED: 401,
+  PAYMENT_DECLINED: 402,
+  FORBIDDEN: 403,
   NOT_FOUND: 404,
   SOLD_OUT: 409,
   INVALID_STATE: 409,
   INVALID_TRANSITION: 409,
 };
-
-export async function readJsonBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const text = Buffer.concat(chunks).toString('utf8');
-  if (text.trim() === '') return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new DomainError('BAD_JSON', 'Request body is not valid JSON');
-  }
-}
 
 async function serveStatic(res, pathname) {
   const publicRoot = fileURLToPath(config.publicDir);
@@ -79,10 +79,19 @@ async function serveStatic(res, pathname) {
   }
 }
 
-export function createApp() {
+// This is the one place that wires the layers together.
+// Tests can pass in their own repository or payment gateway.
+export function createApp({
+  repository = createMemoryRepository(),
+  paymentGateway = createMockPaymentGateway(),
+} = {}) {
   const router = createRouter();
 
   router.get('/health', () => ({ status: 200, body: { status: 'ok' } }));
+
+  const eventService = createEventService(repository);
+  const bookingService = createBookingService(repository, paymentGateway);
+  registerApiRoutes(router, { eventService, bookingService });
 
   const server = createServer(async (req, res) => {
     try {
@@ -111,7 +120,7 @@ export function createApp() {
       return sendError(res, 404, 'NOT_FOUND', 'Not found');
     } catch (error) {
       if (error instanceof DomainError) {
-        const status = error.code === 'BAD_JSON' ? 400 : (STATUS_BY_CODE[error.code] ?? 400);
+        const status = STATUS_BY_CODE[error.code] ?? 400;
         return sendError(res, status, error.code, error.message);
       }
       // Never send a stack trace to the client.
