@@ -34,14 +34,15 @@ export function createBookingService(repository, paymentGateway) {
       throw new DomainError('INVALID_STATE', 'This event is not on sale');
     }
 
-    const left = seatsLeft(tier);
-    if (left < quantity) {
+    // The database checks the seats and takes them in ONE step.
+    // Only the caller that gets "true" owns the seats.
+    const won = await repository.reserveSeats(tierId, quantity);
+    if (!won) {
+      const fresh = await repository.getTier(tierId);
+      const left = seatsLeft(fresh);
       const message = left === 0 ? `${tier.name} is sold out` : `Only ${left} ticket(s) left in ${tier.name}`;
       throw new DomainError('SOLD_OUT', message, { seatsLeft: left });
     }
-
-    tier.sold += quantity;
-    await repository.saveTier(tier);
 
     let reference;
     do {

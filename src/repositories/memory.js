@@ -32,6 +32,16 @@ export function createMemoryRepository() {
       return [...tiers.values()].filter((tier) => tier.eventId === eventId).map((tier) => copy(tier));
     },
 
+    // Same job as the SQLite version: check and add in ONE step.
+    // There is no await inside, so nobody can sneak in between.
+    async reserveSeats(tierId, quantity) {
+      const tier = tiers.get(tierId);
+      if (!tier) return false;
+      if (tier.sold + quantity > tier.capacity) return false;
+      tier.sold += quantity;
+      return true;
+    },
+
     async saveBooking(booking) {
       bookings.set(booking.reference, copy(booking));
       return copy(booking);
