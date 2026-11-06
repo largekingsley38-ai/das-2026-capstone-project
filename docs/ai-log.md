@@ -35,3 +35,34 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 
 **What I changed:** I replaced both messy files whole, re-ran npm test (47 pass) and ran every curl example by hand.
 
+## Build 5
+
+### Prompt 1: move to SQLite and reproduce the problem
+
+**Asked:** The Build 5 Prompt 1 from docs/build-5.md: schema, connection, SQLite repository, seed script, oversell demo.
+
+**What came back:** schema.sql, connection.js, sqlite.js, config.js, server.js, seed.js, oversell-demo.js, package.json scripts, and `data/` in .gitignore.
+
+**What was wrong (or "nothing"):**
+- The prompt says "the services do not change", but server.js and config.js had to change to use SQLite.
+- The demo showed the problem: capacity 1, 50 bookings succeeded, 0 SOLD_OUT, seats sold 1. The database says 1 sold, but 50 bookings exist, so the data is wrong and the CHECK rule did not catch it.
+- A stray `SSS` and a Save As box (wrong folder) cost time. I checked every file with `node --check` and `tail`.
+
+
+### Prompt 2: fix the overselling with one atomic UPDATE
+
+**What came back:** a new `reserveSeats` method in sqlite.js (one `UPDATE ticket_tiers SET sold = sold + ? WHERE id = ? AND sold + ? <= capacity`), a change in bookingService.js, the same method in memory.js, and test/oversell.test.js.
+
+**Why no lock variable and no double check:** A lock variable or a "check then save" double check still leaves a gap between reading the seats and writing them, so two buyers can both pass the check. One UPDATE does the check and the change in a single step inside the database, so only one buyer can win the last seat.
+
+**What was wrong:**
+- The Prompt 1 line "the services do not change" was wrong. bookingService.js had to change to call `reserveSeats`.
+- memory.js also needed `reserveSeats`, or the old 47 tests would break.
+- `cancelBooking` still does read-then-write on `sold` (`tier.sold -= quantity`), so it can lose updates. Not fixed yet.
+- The old demo showed sold=1 for 50 bookings because `saveTier` overwrote `sold` with a stale number.
+
+**How I checked:**
+- Before: capacity 1, 50 succeeded, 0 SOLD_OUT, seats sold 1.
+- After: capacity 1, 1 succeeded, 49 SOLD_OUT, seats sold 1.
+- I removed the seat check on purpose and the SQLite oversell test failed (0 SOLD_OUT, expected 49). I put the fix back and it passed.
+- `npm test`: 49 pass, 0 fail.
