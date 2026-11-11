@@ -66,3 +66,17 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 - After: capacity 1, 1 succeeded, 49 SOLD_OUT, seats sold 1.
 - I removed the seat check on purpose and the SQLite oversell test failed (0 SOLD_OUT, expected 49). I put the fix back and it passed.
 - `npm test`: 49 pass, 0 fail.
+
+## Build 6
+
+### Prompt 1: frontend on mock data
+
+**What came back:** public/index.html, public/event.html, public/js/ui.js, mockData.js, api.js, public/js/pages/home.js and event.js, and public/css/styles.css.
+
+**What was wrong:**
+- The real API has no "one event" route, so getEvent in api.js uses my own shape (event plus tiers). It must be fixed before the site talks to the real server.
+- The real answer shape for booking and pay was a guess. I must check it with curl before Build 7.
+- After tapping Book tickets, the seat count did not update until payment. I found it in the browser and added `await load();` after booking.
+- The AI wrongly said the count would reset to 38 after F5, and wrongly said 37 was wrong. I tested instead of trusting it.
+- A typo in a comment in home.js: "an newer search".
+- home.js and event.js use top-level await, so `node --check` cannot read them. I checked the last lines and the browser instead.

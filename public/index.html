@@ -1,1 +1,48 @@
-<h1>Event Ticketing</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Ticketing</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Event Ticketing</h1>
+  </header>
+
+  <main>
+    <h2>Find an event</h2>
+
+    <div class="filters" role="search">
+      <div class="field">
+        <label for="search">Search</label>
+        <input id="search" type="search" placeholder="Title, city or venue">
+      </div>
+      <div class="field">
+        <label for="city">City</label>
+        <select id="city">
+          <option value="">All cities</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="max-price">Max price (naira)</label>
+        <input id="max-price" type="number" min="0" step="1" inputmode="numeric" placeholder="No limit">
+      </div>
+      <div class="field">
+        <label for="sort">Sort by</label>
+        <select id="sort">
+          <option value="date">Date</option>
+          <option value="price">Price (lowest first)</option>
+          <option value="availability">Seats left</option>
+        </select>
+      </div>
+    </div>
+
+    <p id="status" class="muted" role="status"></p>
+    <ul id="events" class="events"></ul>
+  </main>
+
+  <script type="module" src="/js/pages/home.js"></script>
+</body>
+</html>
