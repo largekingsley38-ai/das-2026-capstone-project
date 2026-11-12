@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event | Event Ticketing</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Event Ticketing</h1>
+    <a href="/">All events</a>
+  </header>
+
+  <main>
+    <p id="status" class="muted" role="status"></p>
+
+    <section id="event-info" aria-live="polite"></section>
+
+    <section id="tiers" aria-label="Ticket tiers"></section>
+
+    <section id="checkout" class="card" hidden>
+      <h2>Checkout</h2>
+      <p id="checkout-summary"></p>
+      <p>Seats held for: <span id="countdown" class="countdown" role="timer"></span></p>
+
+      <div id="checkout-message" role="alert"></div>
+
+      <div class="field">
+        <label for="card-number">Card number (fake, any digits)</label>
+        <input id="card-number" type="text" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242">
+      </div>
+      <div class="field">
+        <label for="card-decline">
+          <input id="card-decline" type="checkbox">
+          Use a card that gets declined (for testing)
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="pay-button" type="button">Pay now</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/pages/event.js"></script>
+</body>
+</html>
