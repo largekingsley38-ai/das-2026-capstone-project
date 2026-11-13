@@ -30,6 +30,11 @@ export function registerApiRoutes(router, { eventService, bookingService }) {
     return { body: { event } };
   });
 
+  router.get('/api/events/:id', async ({ params }) => {
+    const { event, tiers } = await eventService.getPublishedEvent(params.id);
+    return { body: { event, tiers } };
+  });
+
   router.get('/api/events', async ({ url }) => {
     const query = Object.fromEntries(url.searchParams);
     const events = await eventService.searchPublishedEvents(query);
