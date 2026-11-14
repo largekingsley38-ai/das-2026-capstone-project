@@ -42,6 +42,18 @@ export function createMemoryRepository() {
       return true;
     },
 
+    async releaseSeats(tierId, quantity) {
+      const tier = tiers.get(tierId);
+      if (tier) tier.sold = Math.max(0, tier.sold - quantity);
+    },
+    // Compare-and-set: only changes the status if it is still "from".
+    async changeBookingStatus(reference, from, to) {
+      const booking = bookings.get(reference);
+      if (!booking || booking.status !== from) return false;
+      booking.status = to;
+      return true;
+    },
+
     async saveBooking(booking) {
       bookings.set(booking.reference, copy(booking));
       return copy(booking);

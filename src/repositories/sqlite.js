@@ -123,6 +123,17 @@ export function createSqliteRepository(db) {
       return selectTiersForEvent.all(eventId).map(toTier);
     },
 
+    async releaseSeats(tierId, quantity) {
+      db.prepare('UPDATE ticket_tiers SET sold = MAX(0, sold - ?) WHERE id = ?').run(quantity, tierId);
+    },
+    // Compare-and-set in ONE statement: only the first caller wins.
+    async changeBookingStatus(reference, from, to) {
+      const result = db
+        .prepare('UPDATE bookings SET status = ? WHERE reference = ? AND status = ?')
+        .run(to, reference, from);
+      return result.changes === 1;
+    },
+
     async saveBooking(booking) {
       insertUser.run(booking.userId);
       upsertBooking.run(

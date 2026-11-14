@@ -50,6 +50,7 @@ const STATUS_BY_CODE = {
   SOLD_OUT: 409,
   INVALID_STATE: 409,
   INVALID_TRANSITION: 409,
+  EVENT_STARTED: 409,
 };
 
 async function serveStatic(res, pathname) {
