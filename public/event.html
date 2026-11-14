@@ -19,6 +19,13 @@
 
     <section id="tiers" aria-label="Ticket tiers"></section>
 
+    <p id="wait-message" class="muted" role="status"></p>
+
+    <section id="offers" class="card" hidden>
+      <h2>Your waitlist</h2>
+      <div id="offers-list"></div>
+    </section>
+
     <section id="checkout" class="card" hidden>
       <h2>Checkout</h2>
       <p id="checkout-summary"></p>
@@ -39,6 +46,7 @@
 
       <div class="row">
         <button id="pay-button" type="button">Pay now</button>
+        <button id="cancel-button" type="button">Cancel booking</button>
       </div>
     </section>
   </main>

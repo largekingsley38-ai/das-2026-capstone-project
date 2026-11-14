@@ -159,5 +159,21 @@ export function createBookingService(
     return { ...saved, refund };
   }
 
-  return { bookTickets, payBooking, cancelBooking };
+  async function previewRefund(userId, reference) {
+    const user = requireUser(userId);
+    const booking = await mustGetOwnBooking(user, reference);
+    if (booking.status !== 'paid') {
+      return { status: booking.status, refund: { refundCents: 0, percent: 0 } };
+    }
+    const tier = await repository.getTier(booking.tierId);
+    const event = await repository.getEvent(tier.eventId);
+    const refund = calculateRefund({
+      amountCents: booking.amountCents,
+      startsAt: event.startsAt,
+      now: clock.now(),
+    });
+    return { status: booking.status, refund };
+  }
+
+  return { bookTickets, payBooking, cancelBooking, previewRefund };
 }

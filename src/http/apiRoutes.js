@@ -69,6 +69,11 @@ export function registerApiRoutes(router, { eventService, bookingService, waitli
     return { status: 201, body: { booking } };
   });
 
+  router.get('/api/bookings/:reference/refund-preview', async ({ req, params }) => {
+    const preview = await bookingService.previewRefund(callerId(req), params.reference);
+    return { body: { preview } };
+  });
+
   router.post('/api/bookings/:reference/cancel', async ({ req, params }) => {
     const booking = await bookingService.cancelBooking(callerId(req), params.reference);
     return { body: { booking } };
