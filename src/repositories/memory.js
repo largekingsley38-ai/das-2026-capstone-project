@@ -8,6 +8,7 @@ export function createMemoryRepository() {
   const events = new Map();
   const tiers = new Map();
   const bookings = new Map(); // keyed by reference
+  const waitlist = new Map(); // keyed by entry id
 
   return {
     async saveEvent(event) {
@@ -39,6 +40,58 @@ export function createMemoryRepository() {
       if (!tier) return false;
       if (tier.sold + quantity > tier.capacity) return false;
       tier.sold += quantity;
+      return true;
+    },
+
+    async listPendingBookingsBefore(iso) {
+      return [...bookings.values()]
+        .filter((b) => b.status === 'pending' && b.createdAt < iso)
+        .map((b) => copy(b));
+    },
+    async releaseSeats(tierId, quantity) {
+      const tier = tiers.get(tierId);
+      if (tier) tier.sold = Math.max(0, tier.sold - quantity);
+    },
+    // Compare-and-set: only changes the status if it is still "from".
+    async changeBookingStatus(reference, from, to) {
+      const booking = bookings.get(reference);
+      if (!booking || booking.status !== from) return false;
+      booking.status = to;
+      return true;
+    },
+
+    async addWaitlistEntry(entry) {
+      waitlist.set(entry.id, copy(entry));
+      return copy(entry);
+    },
+    async getWaitlistEntry(id) {
+      return copy(waitlist.get(id));
+    },
+    async listWaitlist(tierId, status) {
+      return [...waitlist.values()].filter((e) => e.tierId === tierId && e.status === status).map((e) => copy(e));
+    },
+    async findActiveWaitlistEntry(tierId, userId) {
+      const found = [...waitlist.values()].find(
+        (e) => e.tierId === tierId && e.userId === userId && (e.status === 'waiting' || e.status === 'offered'),
+      );
+      return copy(found);
+    },
+    async listWaitlistForUser(userId) {
+      return [...waitlist.values()]
+        .filter((e) => e.userId === userId && (e.status === 'waiting' || e.status === 'offered'))
+        .map((e) => copy(e));
+    },
+    async listOffersExpiredBefore(iso) {
+      return [...waitlist.values()]
+        .filter((e) => e.status === 'offered' && e.offerExpiresAt <= iso)
+        .map((e) => copy(e));
+    },
+    // Compare-and-set: only changes the status if it is still "from".
+    async changeWaitlistStatus(id, from, to, offerExpiresAt = null) {
+      const entry = waitlist.get(id);
+      if (!entry || entry.status !== from) return false;
+      entry.status = to;
+      entry.offerExpiresAt = offerExpiresAt;
       return true;
     },
 

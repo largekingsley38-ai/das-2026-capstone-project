@@ -3,6 +3,7 @@
 
 import { getEvent, createBooking, pay } from '../api.js';
 import { el, clear, formatPrice } from '../ui.js';
+import { initExtras } from './eventExtras.js';
 
 const MAX_PER_BOOKING = 10;
 
@@ -84,7 +85,7 @@ function tierRow(tier) {
   ];
 
   if (soldOut) {
-    children.push(el('button', { type: 'button', disabled: true, text: 'Sold out' }));
+    children.push(el('button', { type: 'button', text: 'Join waitlist', onClick: () => extras.joinWaitlist(tier) }));
   } else {
     const input = el('input', { id: qtyId, type: 'number', min: 1, max, value: 1, inputmode: 'numeric' });
     const button = el('button', {
@@ -181,3 +182,21 @@ async function load() {
 
 payButton.addEventListener('click', handlePay);
 await load();
+
+const extras = initExtras({
+  eventId,
+  getBooking: () => currentBooking,
+  setBooking: (booking) => {
+    currentBooking = booking;
+  },
+  load,
+  showMessage,
+  startCountdown,
+  stopTimer,
+  checkoutBox,
+  checkoutSummary,
+  countdownEl,
+  payButton,
+  cardInput,
+  declineBox,
+});

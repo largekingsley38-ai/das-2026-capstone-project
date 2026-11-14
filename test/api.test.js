@@ -30,7 +30,7 @@ async function start() {
 async function publishedEvent(call, capacity = 5) {
   const created = await call('POST', '/api/events', {
     user: 'org1',
-    body: { title: 'Lagos Jazz Night', city: 'Lagos', venue: 'Eko Hall', startsAt: '2026-12-05T18:00:00Z' },
+    body: { title: 'Lagos Jazz Night', city: 'Lagos', venue: 'Eko Hall', startsAt: '2030-12-05T18:00:00Z' },
   });
   const eventId = created.json.event.id;
   const tier = await call('POST', `/api/events/${eventId}/tiers`, {
@@ -247,7 +247,7 @@ test('only the person who booked can pay (403 for anyone else)', async () => {
   }
 });
 
-test('cancelling an unpaid booking gives the seats back; a paid one cannot be cancelled yet', async () => {
+test('cancelling an unpaid booking gives the seats back; a paid one is refunded', async () => {
   const { call, close } = await start();
   try {
     const { tierId } = await publishedEvent(call, 2);
@@ -264,7 +264,8 @@ test('cancelling an unpaid booking gives the seats back; a paid one cannot be ca
 
     await call('POST', `/api/bookings/${nowOk.json.booking.reference}/pay`, { user: 'bayo', body: {} });
     const paidCancel = await call('POST', `/api/bookings/${nowOk.json.booking.reference}/cancel`, { user: 'bayo' });
-    assert.equal(paidCancel.status, 409);
+    assert.equal(paidCancel.status, 200);
+    assert.equal(paidCancel.json.booking.status, 'refunded');
   } finally {
     close();
   }

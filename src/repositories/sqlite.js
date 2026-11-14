@@ -24,6 +24,18 @@ function toTier(row) {
   };
 }
 
+function toEntry(row) {
+  return {
+    id: row.id,
+    tierId: row.tier_id,
+    userId: row.user_id,
+    quantity: row.quantity,
+    status: row.status,
+    createdAt: row.created_at,
+    offerExpiresAt: row.offer_expires_at,
+  };
+}
+
 function toBooking(row) {
   const booking = {
     id: row.id,
@@ -121,6 +133,66 @@ export function createSqliteRepository(db) {
     },
     async listTiersForEvent(eventId) {
       return selectTiersForEvent.all(eventId).map(toTier);
+    },
+
+    async listPendingBookingsBefore(iso) {
+      return db
+        .prepare("SELECT * FROM bookings WHERE status = 'pending' AND created_at < ?")
+        .all(iso)
+        .map(toBooking);
+    },
+    async releaseSeats(tierId, quantity) {
+      db.prepare('UPDATE ticket_tiers SET sold = MAX(0, sold - ?) WHERE id = ?').run(quantity, tierId);
+    },
+    // Compare-and-set in ONE statement: only the first caller wins.
+    async changeBookingStatus(reference, from, to) {
+      const result = db
+        .prepare('UPDATE bookings SET status = ? WHERE reference = ? AND status = ?')
+        .run(to, reference, from);
+      return result.changes === 1;
+    },
+
+    async addWaitlistEntry(entry) {
+      insertUser.run(entry.userId);
+      db.prepare(
+        'INSERT INTO waitlist_entries (id, tier_id, user_id, quantity, status, created_at, offer_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ).run(entry.id, entry.tierId, entry.userId, entry.quantity, entry.status, entry.createdAt, entry.offerExpiresAt ?? null);
+      return entry;
+    },
+    async getWaitlistEntry(id) {
+      const row = db.prepare('SELECT * FROM waitlist_entries WHERE id = ?').get(id);
+      return row ? toEntry(row) : undefined;
+    },
+    async listWaitlist(tierId, status) {
+      return db
+        .prepare('SELECT * FROM waitlist_entries WHERE tier_id = ? AND status = ? ORDER BY rowid')
+        .all(tierId, status)
+        .map(toEntry);
+    },
+    async findActiveWaitlistEntry(tierId, userId) {
+      const row = db
+        .prepare("SELECT * FROM waitlist_entries WHERE tier_id = ? AND user_id = ? AND status IN ('waiting', 'offered')")
+        .get(tierId, userId);
+      return row ? toEntry(row) : undefined;
+    },
+    async listWaitlistForUser(userId) {
+      return db
+        .prepare("SELECT * FROM waitlist_entries WHERE user_id = ? AND status IN ('waiting', 'offered') ORDER BY rowid")
+        .all(userId)
+        .map(toEntry);
+    },
+    async listOffersExpiredBefore(iso) {
+      return db
+        .prepare("SELECT * FROM waitlist_entries WHERE status = 'offered' AND offer_expires_at <= ?")
+        .all(iso)
+        .map(toEntry);
+    },
+    // Compare-and-set in ONE statement: only the first caller wins.
+    async changeWaitlistStatus(id, from, to, offerExpiresAt = null) {
+      const result = db
+        .prepare('UPDATE waitlist_entries SET status = ?, offer_expires_at = ? WHERE id = ? AND status = ?')
+        .run(to, offerExpiresAt, id, from);
+      return result.changes === 1;
     },
 
     async saveBooking(booking) {

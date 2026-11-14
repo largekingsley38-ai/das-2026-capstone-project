@@ -10,6 +10,8 @@ import { createMemoryRepository } from '../repositories/memory.js';
 import { createMockPaymentGateway } from '../lib/mockPaymentGateway.js';
 import { createEventService } from '../services/eventService.js';
 import { createBookingService } from '../services/bookingService.js';
+import { createWaitlistService } from '../services/waitlistService.js';
+import { createClock } from '../lib/clock.js';
 import { config } from '../config.js';
 
 // Kept here so older imports of readJsonBody still work.
@@ -50,6 +52,11 @@ const STATUS_BY_CODE = {
   SOLD_OUT: 409,
   INVALID_STATE: 409,
   INVALID_TRANSITION: 409,
+  EVENT_STARTED: 409,
+  BOOKING_EXPIRED: 409,
+  NOT_SOLD_OUT: 409,
+  ALREADY_ON_WAITLIST: 409,
+  OFFER_EXPIRED: 409,
 };
 
 async function serveStatic(res, pathname) {
@@ -84,14 +91,22 @@ async function serveStatic(res, pathname) {
 export function createApp({
   repository = createMemoryRepository(),
   paymentGateway = createMockPaymentGateway(),
+  clock = createClock(),
 } = {}) {
   const router = createRouter();
 
   router.get('/health', () => ({ status: 200, body: { status: 'ok' } }));
 
   const eventService = createEventService(repository);
-  const bookingService = createBookingService(repository, paymentGateway);
-  registerApiRoutes(router, { eventService, bookingService });
+  const waitlistService = createWaitlistService(repository, clock);
+  const bookingService = createBookingService(repository, paymentGateway, clock, undefined, async (tierId) => {
+    try {
+      await waitlistService.offerFreedSeats(tierId);
+    } catch (error) {
+      console.error('waitlist offer failed', error);
+    }
+  });
+  registerApiRoutes(router, { eventService, bookingService, waitlistService });
 
   const server = createServer(async (req, res) => {
     try {

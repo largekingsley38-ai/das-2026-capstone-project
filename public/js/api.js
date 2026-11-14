@@ -76,3 +76,28 @@ export async function pay(reference, input = {}) {
     decline: input.decline === true,
   });
 }
+
+export async function previewRefund(reference) {
+  const data = await request('GET', '/api/bookings/' + encodeURIComponent(reference) + '/refund-preview');
+  return data.preview;
+}
+
+export async function cancelBooking(reference) {
+  return request('POST', '/api/bookings/' + encodeURIComponent(reference) + '/cancel');
+}
+
+export async function joinWaitlist(input = {}) {
+  return request('POST', '/api/waitlist', { tierId: input.tierId, quantity: input.quantity });
+}
+
+export async function getMyWaitlist() {
+  return request('GET', '/api/waitlist/mine');
+}
+
+// The accepted offer becomes a pending booking. Same countdown trick as createBooking.
+export async function acceptOffer(entryId) {
+  const data = await request('POST', '/api/waitlist/' + encodeURIComponent(entryId) + '/accept');
+  const started = Date.parse(data.booking.createdAt);
+  const holdExpiresAt = new Date(started + HOLD_SECONDS * 1000).toISOString();
+  return { booking: { ...data.booking, holdExpiresAt } };
+}

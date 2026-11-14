@@ -3,8 +3,17 @@ import { newId, referenceCode } from '../domain/ids.js';
 import { assertTransition } from '../domain/bookingStateMachine.js';
 import { MAX_TICKETS_PER_BOOKING, seatsLeft } from '../domain/inventory.js';
 import { requireUser } from './eventService.js';
+import { calculateRefund } from '../domain/refundPolicy.js';
+import { createClock } from '../lib/clock.js';
+import { HOLD_SECONDS, isHoldExpired } from '../domain/holdPolicy.js';
 
-export function createBookingService(repository, paymentGateway) {
+export function createBookingService(
+  repository,
+  paymentGateway,
+  clock = createClock(),
+  holdSeconds = HOLD_SECONDS,
+  onSeatsFreed = async () => {},
+) {
   // Finds a booking and checks it belongs to the caller.
   async function mustGetOwnBooking(userId, reference) {
     const booking = await repository.getBookingByReference(reference);
@@ -57,7 +66,7 @@ export function createBookingService(repository, paymentGateway) {
       quantity,
       amountCents: tier.priceCents * quantity,
       status: 'pending',
-      createdAt: new Date().toISOString(),
+      createdAt: clock.now().toISOString(),
     };
     return repository.saveBooking(booking);
   }
@@ -67,6 +76,18 @@ export function createBookingService(repository, paymentGateway) {
     const booking = await mustGetOwnBooking(user, reference);
 
     // Check the rule BEFORE any money moves. A paid or cancelled booking stops here.
+    // An old unpaid booking is expired: free its seats (once) and refuse the payment.
+    const unpaid = booking.status === 'pending' || booking.status === 'cancelled';
+    if (unpaid && isHoldExpired(booking.createdAt, clock.now(), holdSeconds)) {
+      if (booking.status === 'pending') {
+        const won = await repository.changeBookingStatus(reference, 'pending', 'cancelled');
+        if (won) {
+          await repository.releaseSeats(booking.tierId, booking.quantity);
+          await onSeatsFreed(booking.tierId);
+        }
+      }
+      throw new DomainError('BOOKING_EXPIRED', 'This booking expired. Please book again.');
+    }
     assertTransition(booking.status, 'paid');
 
     const result = await paymentGateway.charge({
@@ -91,18 +112,68 @@ export function createBookingService(repository, paymentGateway) {
     const user = requireUser(userId);
     const booking = await mustGetOwnBooking(user, reference);
 
-    assertTransition(booking.status, 'cancelled');
-    if (booking.status === 'paid') {
-      throw new DomainError('INVALID_STATE', 'Paid bookings cannot be cancelled yet (refunds come in Build 8)');
-    }
+    // Paid bookings end as "refunded", unpaid ones as "cancelled".
+    const target = booking.status === 'paid' ? 'refunded' : 'cancelled';
+    assertTransition(booking.status, target);
 
     const tier = await repository.getTier(booking.tierId);
-    tier.sold -= booking.quantity;
-    await repository.saveTier(tier);
+    const changed = () => new DomainError('INVALID_STATE', 'This booking was just changed. Please refresh.');
 
-    booking.status = 'cancelled';
-    return repository.saveBooking(booking);
+    if (booking.status === 'pending') {
+      const won = await repository.changeBookingStatus(reference, 'pending', 'cancelled');
+      if (!won) throw changed();
+      await repository.releaseSeats(booking.tierId, booking.quantity);
+      await onSeatsFreed(booking.tierId);
+      return { ...booking, status: 'cancelled', refund: { refundCents: 0, percent: 0 } };
+    }
+
+    // Paid: work out the refund first (this throws if the event has started).
+    const event = await repository.getEvent(tier.eventId);
+    const refund = calculateRefund({
+      amountCents: booking.amountCents,
+      startsAt: event.startsAt,
+      now: clock.now(),
+    });
+
+    // Only the first caller wins this step, so seats are released once.
+    const won = await repository.changeBookingStatus(reference, 'paid', 'refunded');
+    if (!won) throw changed();
+
+    try {
+      if (refund.refundCents > 0) {
+        await paymentGateway.refund({
+          chargeId: booking.chargeId,
+          reference,
+          amountCents: refund.refundCents,
+        });
+      }
+    } catch (error) {
+      // The money did not move, so put the booking back.
+      await repository.changeBookingStatus(reference, 'refunded', 'paid');
+      throw error;
+    }
+
+    await repository.releaseSeats(booking.tierId, booking.quantity);
+    await onSeatsFreed(booking.tierId);
+    const saved = await repository.getBookingByReference(reference);
+    return { ...saved, refund };
   }
 
-  return { bookTickets, payBooking, cancelBooking };
+  async function previewRefund(userId, reference) {
+    const user = requireUser(userId);
+    const booking = await mustGetOwnBooking(user, reference);
+    if (booking.status !== 'paid') {
+      return { status: booking.status, refund: { refundCents: 0, percent: 0 } };
+    }
+    const tier = await repository.getTier(booking.tierId);
+    const event = await repository.getEvent(tier.eventId);
+    const refund = calculateRefund({
+      amountCents: booking.amountCents,
+      startsAt: event.startsAt,
+      now: clock.now(),
+    });
+    return { status: booking.status, refund };
+  }
+
+  return { bookTickets, payBooking, cancelBooking, previewRefund };
 }

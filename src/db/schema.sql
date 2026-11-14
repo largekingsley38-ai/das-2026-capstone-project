@@ -40,3 +40,15 @@ CREATE TABLE IF NOT EXISTS bookings (
 
 CREATE INDEX IF NOT EXISTS idx_tiers_event ON ticket_tiers(event_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_tier ON bookings(tier_id);
+
+CREATE TABLE IF NOT EXISTS waitlist_entries (
+  id TEXT PRIMARY KEY,
+  tier_id TEXT NOT NULL REFERENCES ticket_tiers(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  quantity INTEGER NOT NULL CHECK (quantity >= 1),
+  status TEXT NOT NULL CHECK (status IN ('waiting', 'offered', 'accepted', 'expired')),
+  created_at TEXT NOT NULL,
+  offer_expires_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_waitlist_tier ON waitlist_entries(tier_id);
