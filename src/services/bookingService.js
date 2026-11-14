@@ -12,6 +12,7 @@ export function createBookingService(
   paymentGateway,
   clock = createClock(),
   holdSeconds = HOLD_SECONDS,
+  onSeatsFreed = async () => {},
 ) {
   // Finds a booking and checks it belongs to the caller.
   async function mustGetOwnBooking(userId, reference) {
@@ -80,7 +81,10 @@ export function createBookingService(
     if (unpaid && isHoldExpired(booking.createdAt, clock.now(), holdSeconds)) {
       if (booking.status === 'pending') {
         const won = await repository.changeBookingStatus(reference, 'pending', 'cancelled');
-        if (won) await repository.releaseSeats(booking.tierId, booking.quantity);
+        if (won) {
+          await repository.releaseSeats(booking.tierId, booking.quantity);
+          await onSeatsFreed(booking.tierId);
+        }
       }
       throw new DomainError('BOOKING_EXPIRED', 'This booking expired. Please book again.');
     }
@@ -119,6 +123,7 @@ export function createBookingService(
       const won = await repository.changeBookingStatus(reference, 'pending', 'cancelled');
       if (!won) throw changed();
       await repository.releaseSeats(booking.tierId, booking.quantity);
+      await onSeatsFreed(booking.tierId);
       return { ...booking, status: 'cancelled', refund: { refundCents: 0, percent: 0 } };
     }
 
@@ -149,6 +154,7 @@ export function createBookingService(
     }
 
     await repository.releaseSeats(booking.tierId, booking.quantity);
+    await onSeatsFreed(booking.tierId);
     const saved = await repository.getBookingByReference(reference);
     return { ...saved, refund };
   }

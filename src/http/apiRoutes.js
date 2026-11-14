@@ -7,7 +7,7 @@ function callerId(req) {
   return req.headers['x-user-id'];
 }
 
-export function registerApiRoutes(router, { eventService, bookingService }) {
+export function registerApiRoutes(router, { eventService, bookingService, waitlistService }) {
   router.post('/api/events', async ({ req }) => {
     const body = await readJsonBody(req);
     const event = await eventService.createEvent(callerId(req), body);
@@ -51,6 +51,22 @@ export function registerApiRoutes(router, { eventService, bookingService }) {
     const body = await readJsonBody(req);
     const booking = await bookingService.payBooking(callerId(req), params.reference, body);
     return { body: { booking } };
+  });
+
+  router.post('/api/waitlist', async ({ req }) => {
+    const body = await readJsonBody(req);
+    const entry = await waitlistService.joinWaitlist(callerId(req), body);
+    return { status: 201, body: { entry } };
+  });
+
+  router.get('/api/waitlist/mine', async ({ req }) => {
+    const entries = await waitlistService.listMine(callerId(req));
+    return { body: { entries } };
+  });
+
+  router.post('/api/waitlist/:id/accept', async ({ req, params }) => {
+    const booking = await waitlistService.acceptOffer(callerId(req), params.id);
+    return { status: 201, body: { booking } };
   });
 
   router.post('/api/bookings/:reference/cancel', async ({ req, params }) => {
