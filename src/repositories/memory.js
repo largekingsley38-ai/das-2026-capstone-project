@@ -42,6 +42,11 @@ export function createMemoryRepository() {
       return true;
     },
 
+    async listPendingBookingsBefore(iso) {
+      return [...bookings.values()]
+        .filter((b) => b.status === 'pending' && b.createdAt < iso)
+        .map((b) => copy(b));
+    },
     async releaseSeats(tierId, quantity) {
       const tier = tiers.get(tierId);
       if (tier) tier.sold = Math.max(0, tier.sold - quantity);

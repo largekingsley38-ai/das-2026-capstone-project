@@ -5,8 +5,14 @@ import { MAX_TICKETS_PER_BOOKING, seatsLeft } from '../domain/inventory.js';
 import { requireUser } from './eventService.js';
 import { calculateRefund } from '../domain/refundPolicy.js';
 import { createClock } from '../lib/clock.js';
+import { HOLD_SECONDS, isHoldExpired } from '../domain/holdPolicy.js';
 
-export function createBookingService(repository, paymentGateway, clock = createClock()) {
+export function createBookingService(
+  repository,
+  paymentGateway,
+  clock = createClock(),
+  holdSeconds = HOLD_SECONDS,
+) {
   // Finds a booking and checks it belongs to the caller.
   async function mustGetOwnBooking(userId, reference) {
     const booking = await repository.getBookingByReference(reference);
@@ -59,7 +65,7 @@ export function createBookingService(repository, paymentGateway, clock = createC
       quantity,
       amountCents: tier.priceCents * quantity,
       status: 'pending',
-      createdAt: new Date().toISOString(),
+      createdAt: clock.now().toISOString(),
     };
     return repository.saveBooking(booking);
   }
@@ -69,6 +75,15 @@ export function createBookingService(repository, paymentGateway, clock = createC
     const booking = await mustGetOwnBooking(user, reference);
 
     // Check the rule BEFORE any money moves. A paid or cancelled booking stops here.
+    // An old unpaid booking is expired: free its seats (once) and refuse the payment.
+    const unpaid = booking.status === 'pending' || booking.status === 'cancelled';
+    if (unpaid && isHoldExpired(booking.createdAt, clock.now(), holdSeconds)) {
+      if (booking.status === 'pending') {
+        const won = await repository.changeBookingStatus(reference, 'pending', 'cancelled');
+        if (won) await repository.releaseSeats(booking.tierId, booking.quantity);
+      }
+      throw new DomainError('BOOKING_EXPIRED', 'This booking expired. Please book again.');
+    }
     assertTransition(booking.status, 'paid');
 
     const result = await paymentGateway.charge({

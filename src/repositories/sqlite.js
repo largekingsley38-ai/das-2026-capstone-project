@@ -123,6 +123,12 @@ export function createSqliteRepository(db) {
       return selectTiersForEvent.all(eventId).map(toTier);
     },
 
+    async listPendingBookingsBefore(iso) {
+      return db
+        .prepare("SELECT * FROM bookings WHERE status = 'pending' AND created_at < ?")
+        .all(iso)
+        .map(toBooking);
+    },
     async releaseSeats(tierId, quantity) {
       db.prepare('UPDATE ticket_tiers SET sold = MAX(0, sold - ?) WHERE id = ?').run(quantity, tierId);
     },
