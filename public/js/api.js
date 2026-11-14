@@ -1,16 +1,10 @@
 // The ONLY file the pages use to get data.
-// Right now it reads from mockData.js. Later it can call the real server.
-// Every function returns a promise, like the real API would.
+// It now calls the real server. Same function names as before.
 
-import { events, tiers, HOLD_SECONDS } from './mockData.js';
+import { HOLD_SECONDS } from './mockData.js';
 
-const MAX_PER_BOOKING = 10;
-
-// Copies of the data, so pages cannot change it by accident.
-const tierList = tiers.map((tier) => ({ ...tier }));
-const bookings = new Map();
-
-const wait = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
+// Who is booking. The real server reads this header.
+const USER_ID = 'buyer1';
 
 function apiError(code, message) {
   const error = new Error(message);
@@ -18,101 +12,67 @@ function apiError(code, message) {
   return error;
 }
 
-function seatsLeft(tier) {
-  return tier.capacity - tier.sold;
-}
+// One helper for every call. Errors look like { error: { code, message } }.
+async function request(method, path, body) {
+  const headers = { 'x-user-id': USER_ID };
+  if (body !== undefined) headers['content-type'] = 'application/json';
 
-function summary(event) {
-  const own = tierList.filter((tier) => tier.eventId === event.id);
-  return {
-    ...event,
-    cheapestPriceCents: own.length ? Math.min(...own.map((tier) => tier.priceCents)) : null,
-    seatsLeft: own.reduce((total, tier) => total + seatsLeft(tier), 0),
-  };
+  let res;
+  try {
+    res = await fetch(path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw apiError('NETWORK', 'Cannot reach the server');
+  }
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+
+  if (!res.ok) {
+    throw apiError(
+      data?.error?.code ?? 'ERROR',
+      data?.error?.message ?? `Request failed (${res.status})`,
+    );
+  }
+  return data;
 }
 
 // options: q, city, maxPriceCents, onlyAvailable, sort (date | price | availability)
 export async function listEvents(options = {}) {
-  await wait();
   const { q = '', city = '', maxPriceCents, onlyAvailable = false, sort = 'date' } = options;
-  const text = q.trim().toLowerCase();
-
-  let list = events.filter((event) => event.status === 'published').map(summary);
-
-  if (text) {
-    list = list.filter((event) =>
-      [event.title, event.city, event.venue].some((field) => field.toLowerCase().includes(text)),
-    );
-  }
-  if (city) list = list.filter((event) => event.city.toLowerCase() === city.toLowerCase());
-  if (typeof maxPriceCents === 'number') {
-    list = list.filter((event) => event.cheapestPriceCents !== null && event.cheapestPriceCents <= maxPriceCents);
-  }
-  if (onlyAvailable) list = list.filter((event) => event.seatsLeft > 0);
-
-  if (sort === 'price') {
-    list.sort((a, b) => (a.cheapestPriceCents ?? Infinity) - (b.cheapestPriceCents ?? Infinity));
-  } else if (sort === 'availability') {
-    list.sort((a, b) => b.seatsLeft - a.seatsLeft);
-  } else {
-    list.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  }
-  return { events: list };
+  const params = new URLSearchParams();
+  if (q.trim()) params.set('q', q.trim());
+  if (city) params.set('city', city);
+  if (typeof maxPriceCents === 'number') params.set('maxPriceCents', String(maxPriceCents));
+  if (onlyAvailable) params.set('onlyAvailable', 'true');
+  params.set('sort', sort);
+  return request('GET', `/api/events?${params.toString()}`);
 }
 
-// The real server has no "one event" route yet, so this is our own shape:
-// the event plus its tiers (each with seatsLeft).
+// Returns { event, tiers } (each tier has seatsLeft).
 export async function getEvent(id) {
-  await wait();
-  const event = events.find((item) => item.id === id && item.status === 'published');
-  if (!event) throw apiError('NOT_FOUND', 'Event not found');
-  const own = tierList
-    .filter((tier) => tier.eventId === id)
-    .map((tier) => ({ ...tier, seatsLeft: seatsLeft(tier) }));
-  return { event, tiers: own };
+  return request('GET', `/api/events/${encodeURIComponent(id)}`);
 }
 
+// The server has no hold timer, so holdExpiresAt is added here for the countdown only.
 export async function createBooking(input = {}) {
-  await wait();
   const { tierId, quantity } = input;
-  const tier = tierList.find((item) => item.id === tierId);
-  if (!tier) throw apiError('NOT_FOUND', 'Ticket tier not found');
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_PER_BOOKING) {
-    throw apiError('VALIDATION', `quantity must be between 1 and ${MAX_PER_BOOKING}`);
-  }
-  const left = seatsLeft(tier);
-  if (left === 0) throw apiError('SOLD_OUT', `${tier.name} is sold out`);
-  if (quantity > left) throw apiError('SOLD_OUT', `Only ${left} ticket(s) left in ${tier.name}`);
-
-  tier.sold += quantity;
-  const reference = 'BK' + Math.random().toString(36).slice(2, 8).toUpperCase();
-  const now = Date.now();
-  const booking = {
-    reference,
-    tierId,
-    quantity,
-    amountCents: tier.priceCents * quantity,
-    status: 'pending',
-    createdAt: new Date(now).toISOString(),
-    holdExpiresAt: new Date(now + HOLD_SECONDS * 1000).toISOString(),
-  };
-  bookings.set(reference, booking);
-  return { booking: { ...booking } };
+  const data = await request('POST', '/api/bookings', { tierId, quantity });
+  const started = Date.parse(data.booking.createdAt);
+  const holdExpiresAt = new Date(started + HOLD_SECONDS * 1000).toISOString();
+  return { booking: { ...data.booking, holdExpiresAt } };
 }
 
-// input.decline = true makes the fake card fail, like the real mock gateway.
+// input.decline = true makes the fake card fail.
 export async function pay(reference, input = {}) {
-  await wait(400);
-  const booking = bookings.get(reference);
-  if (!booking) throw apiError('NOT_FOUND', 'Booking not found');
-  if (booking.status !== 'pending') throw apiError('INVALID_STATE', `Booking is already ${booking.status}`);
-  if (Date.now() > Date.parse(booking.holdExpiresAt)) {
-    throw apiError('INVALID_STATE', 'Your hold ran out. Please book again.');
-  }
-  if (input.decline === true) {
-    throw apiError('PAYMENT_DECLINED', 'The card was declined. The booking is still pending.');
-  }
-  booking.status = 'paid';
-  booking.paidAt = new Date().toISOString();
-  return { booking: { ...booking } };
+  return request('POST', `/api/bookings/${encodeURIComponent(reference)}/pay`, {
+    decline: input.decline === true,
+  });
 }

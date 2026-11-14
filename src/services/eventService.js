@@ -119,5 +119,13 @@ export function createEventService(repository) {
     return searchEvents(summaries, criteria, query.sort ?? 'date');
   }
 
-  return { createEvent, addTier, publishEvent, unpublishEvent, searchPublishedEvents };
+  async function getPublishedEvent(eventId) {
+    const event = await mustGetEvent(eventId);
+    if (event.status !== 'published') throw new DomainError('NOT_FOUND', 'Event not found');
+    const rows = await repository.listTiersForEvent(event.id);
+    const tiers = rows.map((tier) => ({ ...tier, seatsLeft: seatsLeft(tier) }));
+    return { event, tiers };
+  }
+
+  return { createEvent, addTier, publishEvent, unpublishEvent, searchPublishedEvents, getPublishedEvent };
 }
