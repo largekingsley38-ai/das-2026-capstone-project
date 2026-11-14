@@ -175,5 +175,9 @@ export function createBookingService(
     return { status: booking.status, refund };
   }
 
-  return { bookTickets, payBooking, cancelBooking, previewRefund };
+  async function listMine(userId) {
+    return repository.listBookingsForUser(requireUser(userId));
+  }
+
+  return { bookTickets, payBooking, cancelBooking, previewRefund, listMine };
 }

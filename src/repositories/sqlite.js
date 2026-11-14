@@ -24,6 +24,16 @@ function toTier(row) {
   };
 }
 
+function toAccount(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    role: row.role,
+    createdAt: row.created_at,
+  };
+}
+
 function toEntry(row) {
   return {
     id: row.id,
@@ -193,6 +203,29 @@ export function createSqliteRepository(db) {
         .prepare('UPDATE waitlist_entries SET status = ?, offer_expires_at = ? WHERE id = ? AND status = ?')
         .run(to, offerExpiresAt, id, from);
       return result.changes === 1;
+    },
+
+    async createAccount(account) {
+      insertUser.run(account.id);
+      // UNIQUE on email: if it is taken, nothing is inserted.
+      const result = db
+        .prepare('INSERT OR IGNORE INTO accounts (id, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(account.id, account.email, account.passwordHash, account.role, account.createdAt);
+      return result.changes === 1;
+    },
+    async findAccountByEmail(email) {
+      const row = db.prepare('SELECT * FROM accounts WHERE email = ?').get(email);
+      return row ? toAccount(row) : undefined;
+    },
+    async getAccount(id) {
+      const row = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+      return row ? toAccount(row) : undefined;
+    },
+    async listBookingsForUser(userId) {
+      return db
+        .prepare('SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at')
+        .all(userId)
+        .map(toBooking);
     },
 
     async saveBooking(booking) {

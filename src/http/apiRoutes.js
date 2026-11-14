@@ -1,16 +1,47 @@
 import { readJsonBody } from './body.js';
+import { DomainError } from '../domain/errors.js';
+import { verifyToken } from '../lib/token.js';
 
 // Routes only read the request and shape the response.
 // All rules live in the services.
 
-function callerId(req) {
-  return req.headers['x-user-id'];
+function bearerToken(req) {
+  const header = req.headers['authorization'];
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return undefined;
+  return header.slice(7).trim();
 }
 
-export function registerApiRoutes(router, { eventService, bookingService, waitlistService }) {
+export function registerApiRoutes(router, { eventService, bookingService, waitlistService, authService, tokenSecret }) {
+  // Who is calling? Read from the signed token, never from a plain header.
+  const caller = (req) => verifyToken(bearerToken(req), { secret: tokenSecret });
+  const callerId = (req) => caller(req).sub;
+  function requireRole(req, role) {
+    const who = caller(req);
+    if (who.role !== role) throw new DomainError('FORBIDDEN', 'Only ' + role + ' accounts can do this');
+    return who.sub;
+  }
+
+  router.post('/api/auth/signup', async ({ req }) => {
+    const body = await readJsonBody(req);
+    return { status: 201, body: await authService.signup(body) };
+  });
+
+  router.post('/api/auth/login', async ({ req }) => {
+    const body = await readJsonBody(req);
+    return { body: await authService.login(body) };
+  });
+
+  router.get('/api/auth/me', async ({ req }) => {
+    return { body: { user: await authService.me(callerId(req)) } };
+  });
+
+  router.get('/api/bookings', async ({ req }) => {
+    return { body: { bookings: await bookingService.listMine(callerId(req)) } };
+  });
+
   router.post('/api/events', async ({ req }) => {
     const body = await readJsonBody(req);
-    const event = await eventService.createEvent(callerId(req), body);
+    const event = await eventService.createEvent(requireRole(req, 'organizer'), body);
     return { status: 201, body: { event } };
   });
 

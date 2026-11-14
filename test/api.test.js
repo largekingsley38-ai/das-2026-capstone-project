@@ -2,18 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createApp } from '../src/http/app.js';
+import { signToken } from '../src/lib/token.js';
+
+const SECRET = 'test-secret-at-least-16-chars';
+const roleOf = (user) => (user.startsWith('org') ? 'organizer' : 'attendee');
 import { createMockPaymentGateway } from '../src/lib/mockPaymentGateway.js';
 
 // Starts the real server on a free port (port 0 = "pick any free one").
 async function start() {
   const paymentGateway = createMockPaymentGateway();
-  const server = createApp({ paymentGateway });
+  const server = createApp({ paymentGateway, tokenSecret: SECRET });
   await new Promise((resolve) => server.listen(0, resolve));
   const base = `http://localhost:${server.address().port}`;
 
   async function call(method, path, { user, body } = {}) {
     const headers = {};
-    if (user) headers['x-user-id'] = user;
+    if (user) headers.authorization = 'Bearer ' + signToken({ sub: user, role: roleOf(user) }, { secret: SECRET });
     if (body !== undefined) headers['content-type'] = 'application/json';
     const res = await fetch(base + path, {
       method,
@@ -85,7 +89,7 @@ test('bad JSON is 400 BAD_JSON (a real POST)', async () => {
     await new Promise((resolve) => server.listen(0, resolve));
     const res = await fetch(`http://localhost:${server.address().port}/api/events`, {
       method: 'POST',
-      headers: { 'x-user-id': 'org1', 'content-type': 'application/json' },
+      headers: { authorization: 'Bearer ' + signToken({ sub: 'org1', role: 'organizer' }, { secret: SECRET }), 'content-type': 'application/json' },
       body: '{ not json',
     });
     const json = await res.json();

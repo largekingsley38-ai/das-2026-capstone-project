@@ -52,3 +52,11 @@ CREATE TABLE IF NOT EXISTS waitlist_entries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_waitlist_tier ON waitlist_entries(tier_id);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY REFERENCES users(id),
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('attendee', 'organizer', 'staff')),
+  created_at TEXT NOT NULL
+);
