@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My events | Event Ticketing</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Event Ticketing</h1>
+    <nav id="nav"></nav>
+    <a href="/">All events</a>
+  </header>
+
+  <main>
+    <h2>Create an event</h2>
+    <section class="card">
+      <div id="org-message" role="alert"></div>
+      <div class="field">
+        <label for="title">Title</label>
+        <input id="title" type="text">
+      </div>
+      <div class="field">
+        <label for="city">City</label>
+        <input id="city" type="text">
+      </div>
+      <div class="field">
+        <label for="venue">Venue</label>
+        <input id="venue" type="text">
+      </div>
+      <div class="field">
+        <label for="starts">Start date and time</label>
+        <input id="starts" type="datetime-local">
+      </div>
+      <div class="field">
+        <label for="tier-name">First tier name</label>
+        <input id="tier-name" type="text" value="Regular">
+      </div>
+      <div class="field">
+        <label for="tier-price">Tier price (naira)</label>
+        <input id="tier-price" type="number" min="0" step="1" inputmode="numeric" value="5000">
+      </div>
+      <div class="field">
+        <label for="tier-capacity">Tier capacity (seats)</label>
+        <input id="tier-capacity" type="number" min="1" step="1" inputmode="numeric" value="10">
+      </div>
+      <div class="row">
+        <button id="create-button" type="button">Create event with tier</button>
+      </div>
+    </section>
+
+    <h2>Events</h2>
+    <p class="muted">Published events from all organizers. Publishing works only on your own events.</p>
+    <p id="status" class="muted" role="status"></p>
+    <section id="events" aria-label="Events"></section>
+  </main>
+
+  <script type="module" src="/js/nav.js"></script>
+  <script type="module" src="/js/pages/organizer.js"></script>
+</body>
+</html>
