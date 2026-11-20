@@ -83,6 +83,8 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 
 ## Build 7
 
+**Correction: this Build 7 note was not complete.** It only covers connecting the frontend. The real brief (signup/login, hashed passwords, signed tokens, 3 roles, private bookings, organizer ownership, login/tickets/organizer pages) was not done. See "Build 7 fix" at the end of this file.
+
 ### Prompt 1: connect the frontend to the real API
 
 **What came back:** a new GET /api/events/:id route (getPublishedEvent in eventService.js), 3 tests in test/eventOne.test.js, and a new public/js/api.js that calls the real server.
@@ -121,3 +123,20 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 - Tests for every refund boundary (exactly 7 days, 6 days 23 hours, exactly 2 days, 1 day 23 hours), cancelling twice, waitlist order, offer expiry passing to the next person, and unpaid hold expiry.
 - Browser and database: joined the waitlist, freed the seat, the offer was accepted, paid, cancelled with the refund shown first, and the tier went back to sold 0.
 - npm test: 78 pass, 0 fail.
+## Build 7 fix
+
+### What went wrong the first time
+- I marked Build 7 as finished, but I had only connected the frontend to the API. Login, signup, hashed passwords, signed tokens, roles, private bookings and organizer ownership were missing. The teacher told me it needed adjustments.
+- I did not check my work against docs/build-7.md before saying it was done.
+- The patch scripts failed on Windows because the files use CRLF line endings and the scripts looked for LF. I had to rewrite the patches so they ignore CRLF.
+- I pasted one code file twice by mistake, so I now paste each code block only once.
+
+### What I did to fix it
+- Added password.js (hashing with a salt), token.js (signed tokens that expire), authService, roles and ownership checks, with tests. 99 tests pass.
+- Added the frontend: api.js with tokens, session.js, nav.js, login.html, tickets.html and organizer.html with their page scripts, plus changes to index.html and event.html. Merged as PR #8 in my fork.
+- Fixed a 20-second debug delay in login.js back to 1.5 seconds before committing.
+
+### Still open
+- The brief says another person's booking should give NOT_FOUND. My code gives FORBIDDEN. I must ask the instructor which one he wants.
+- Still to check in the browser: event.html with a logged-out user (should go to login) and a paid booking showing Status: paid on tickets.html.
+- Some earlier files in this project were written by AI. I should say that clearly in this log.
