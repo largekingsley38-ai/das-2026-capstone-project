@@ -9,6 +9,7 @@ export function createMemoryRepository() {
   const tiers = new Map();
   const bookings = new Map(); // keyed by reference
   const waitlist = new Map(); // keyed by entry id
+  const accounts = new Map(); // keyed by account id
 
   return {
     async saveEvent(event) {
@@ -93,6 +94,23 @@ export function createMemoryRepository() {
       entry.status = to;
       entry.offerExpiresAt = offerExpiresAt;
       return true;
+    },
+
+    async createAccount(account) {
+      for (const existing of accounts.values()) {
+        if (existing.email === account.email) return false;
+      }
+      accounts.set(account.id, copy(account));
+      return true;
+    },
+    async findAccountByEmail(email) {
+      return copy([...accounts.values()].find((a) => a.email === email));
+    },
+    async getAccount(id) {
+      return copy(accounts.get(id));
+    },
+    async listBookingsForUser(userId) {
+      return [...bookings.values()].filter((b) => b.userId === userId).map((b) => copy(b));
     },
 
     async saveBooking(booking) {

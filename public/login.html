@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in | Event Ticketing</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Event Ticketing</h1>
+    <nav id="nav"></nav>
+    <a href="/">All events</a>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Log in or sign up</h2>
+      <div id="login-message" role="alert"></div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="password">Password (at least 8 characters)</label>
+        <input id="password" type="password" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="role">Role (only used when you sign up)</label>
+        <select id="role">
+          <option value="attendee">Attendee</option>
+          <option value="organizer">Organizer</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <button id="login-button" type="button">Log in</button>
+        <button id="signup-button" type="button">Sign up</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/nav.js"></script>
+  <script type="module" src="/js/pages/login.js"></script>
+</body>
+</html>

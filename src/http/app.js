@@ -11,6 +11,8 @@ import { createMockPaymentGateway } from '../lib/mockPaymentGateway.js';
 import { createEventService } from '../services/eventService.js';
 import { createBookingService } from '../services/bookingService.js';
 import { createWaitlistService } from '../services/waitlistService.js';
+import { createAuthService } from '../services/authService.js';
+import { randomBytes } from 'node:crypto';
 import { createClock } from '../lib/clock.js';
 import { config } from '../config.js';
 
@@ -57,6 +59,8 @@ const STATUS_BY_CODE = {
   NOT_SOLD_OUT: 409,
   ALREADY_ON_WAITLIST: 409,
   OFFER_EXPIRED: 409,
+  EMAIL_TAKEN: 409,
+  INVALID_CREDENTIALS: 401,
 };
 
 async function serveStatic(res, pathname) {
@@ -92,6 +96,7 @@ export function createApp({
   repository = createMemoryRepository(),
   paymentGateway = createMockPaymentGateway(),
   clock = createClock(),
+  tokenSecret = randomBytes(32).toString('hex'),
 } = {}) {
   const router = createRouter();
 
@@ -106,7 +111,8 @@ export function createApp({
       console.error('waitlist offer failed', error);
     }
   });
-  registerApiRoutes(router, { eventService, bookingService, waitlistService });
+  const authService = createAuthService(repository, { secret: tokenSecret });
+  registerApiRoutes(router, { eventService, bookingService, waitlistService, authService, tokenSecret });
 
   const server = createServer(async (req, res) => {
     try {

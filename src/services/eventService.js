@@ -6,7 +6,7 @@ import { seatsLeft } from '../domain/inventory.js';
 // Small input checks, shared with bookingService.
 export function requireUser(userId) {
   if (typeof userId !== 'string' || userId.trim() === '') {
-    throw new DomainError('UNAUTHENTICATED', 'The x-user-id header is required');
+    throw new DomainError('UNAUTHENTICATED', 'You must be logged in');
   }
   return userId.trim();
 }
@@ -30,6 +30,12 @@ function wholeNumberFromQuery(value, field) {
     throw new DomainError('VALIDATION', `${field} must be a whole number`);
   }
   return Number(value);
+}
+
+function assertOwner(userId, event) {
+  if (event.organizerId !== userId) {
+    throw new DomainError('FORBIDDEN', 'This event belongs to another organizer');
+  }
 }
 
 export function createEventService(repository) {
@@ -57,8 +63,8 @@ export function createEventService(repository) {
   }
 
   async function addTier(userId, eventId, input = {}) {
-    requireUser(userId);
-    await mustGetEvent(eventId);
+    const user = requireUser(userId);
+    assertOwner(user, await mustGetEvent(eventId));
     const tier = {
       id: newId(),
       eventId,
@@ -72,8 +78,9 @@ export function createEventService(repository) {
   }
 
   async function setStatus(userId, eventId, status) {
-    requireUser(userId);
+    const user = requireUser(userId);
     const event = await mustGetEvent(eventId);
+    assertOwner(user, event);
     if (status === 'published') {
       const tiers = await repository.listTiersForEvent(eventId);
       if (tiers.length === 0) {

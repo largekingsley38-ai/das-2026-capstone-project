@@ -1,4 +1,5 @@
 import { createApp } from './http/app.js';
+import { randomBytes } from 'node:crypto';
 import { config } from './config.js';
 import { openDatabase } from './db/connection.js';
 import { createSqliteRepository } from './repositories/sqlite.js';
@@ -8,7 +9,13 @@ import { createWaitlistService } from './services/waitlistService.js';
 // The server now keeps its data in a file, so it survives a restart.
 const db = openDatabase(config.dbFile);
 const repository = createSqliteRepository(db);
-const server = createApp({ repository });
+// The token secret comes from the environment. It is never written in the code.
+let tokenSecret = process.env.TOKEN_SECRET;
+if (!tokenSecret) {
+  tokenSecret = randomBytes(32).toString('hex');
+  console.log('TOKEN_SECRET is not set. Using a temporary one: everyone must log in again after a restart.');
+}
+const server = createApp({ repository, tokenSecret });
 
 // Every 30 seconds: cancel unpaid bookings that ran out of time.
 const waitlist = createWaitlistService(repository);

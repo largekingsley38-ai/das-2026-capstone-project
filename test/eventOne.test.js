@@ -2,16 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createApp } from '../src/http/app.js';
+import { signToken } from '../src/lib/token.js';
+
+const SECRET = 'test-secret-at-least-16-chars';
+const roleOf = (user) => (user.startsWith('org') ? 'organizer' : 'attendee');
 import { createMockPaymentGateway } from '../src/lib/mockPaymentGateway.js';
 
 async function start() {
-  const server = createApp({ paymentGateway: createMockPaymentGateway() });
+  const server = createApp({ paymentGateway: createMockPaymentGateway(), tokenSecret: SECRET });
   await new Promise((resolve) => server.listen(0, resolve));
   const base = `http://localhost:${server.address().port}`;
 
   async function call(method, path, { user, body } = {}) {
     const headers = {};
-    if (user) headers['x-user-id'] = user;
+    if (user) headers.authorization = 'Bearer ' + signToken({ sub: user, role: roleOf(user) }, { secret: SECRET });
     if (body !== undefined) headers['content-type'] = 'application/json';
     const res = await fetch(base + path, {
       method,
