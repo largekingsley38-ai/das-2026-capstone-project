@@ -144,7 +144,37 @@ Follow the "Done when" list in [docs/build-1.md](docs/build-1.md). Work on a bra
 ## Project layout
 
 ```
-src/domain/     plain rules: no I/O, no HTTP
-scripts/        things you run by hand
-docs/           milestones and user stories
+src/domain/        plain rules: no I/O, no HTTP
+src/services/      business rules for the API, using domain rules and a repository
+src/db/            SQLite schema (constraints) and the connection
+src/repositories/  data access only: SQLite for the server, in memory for comparison
+src/lib/           outside pieces: mock payment gateway, tokens, passwords, clock
+src/http/          router, routes, OpenAPI description and the HTTP server
+src/jobs/          background jobs (expiry of holds and waitlist offers)
+public/            the website (HTML and JavaScript)
+test/              automated tests (npm test)
+scripts/           things you run by hand
+docs/              milestones, user stories, API description and AI log
 ```
+
+## Build 4: try the API
+
+```bash
+npm start
+```
+
+Open http://localhost:3000/docs.html for the API docs. Every route, its inputs and its errors are listed there, and you can send test requests from the page (it needs an internet connection to load the viewer). The page is built from the OpenAPI description in `src/http/openapi.js`, served at `/openapi.json`, so change that file whenever you change a route in `src/http/apiRoutes.js`. `test/openapi.test.js` fails if a documented route does not exist.
+
+Since Build 7, calls that need to know who you are send `Authorization: Bearer <token>`. Get the token from `POST /api/auth/signup` or `POST /api/auth/login`.
+
+To use Hoppscotch, import `docs/hoppscotch/build-4.collection.json` (Collections, then Import) and `docs/hoppscotch/local.environment.json` (Environments, then Import). These two files are from Build 4 and still use the old `x-user-id` header, so they will not work with login. You can also import `docs/openapi.json` into Hoppscotch, Postman or Insomnia; regenerate it with `npm run export:openapi`.
+
+## Build 5: SQLite and the last ticket
+
+```bash
+npm run seed       # once: adds a few published events to the database
+npm start          # the API keeps its data after a restart
+npm run oversell   # 50 people try to book the last seat at the same moment
+```
+
+`npm run oversell` runs the race twice. The Build 4 way (read the tier, check in JavaScript, then save) lets all 50 bookings through. The Build 5 way takes the seats with one atomic statement, `UPDATE ticket_tiers SET sold = sold + ? WHERE id = ? AND sold + ? <= capacity`, and only the request that changed a row gets the seat: 1 succeeds, 49 get `SOLD_OUT`. `test/oversell.test.js` proves it. Set `DB_FILE` to use another database file. The schema, with its PRIMARY KEY, FOREIGN KEY, UNIQUE and CHECK constraints, is in `src/db/schema.sql`.
