@@ -1,0 +1,1522 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Event Ticketing API",
+    "version": "0.8.0",
+    "description": "Events, ticket tiers, bookings, mock payment, refunds, waitlist and login. Data is stored in SQLite.\n\n**Who you are.** Sign up or log in to get a signed token, then send `Authorization: Bearer <token>`. There are three roles: attendee, organizer and staff. Only organizers can create events.\n\n**Money** is a whole number of the smallest unit (kobo): `500000` is 5,000.00.\n\n**Errors** always look like `{ \"error\": { \"code\": \"SOLD_OUT\", \"message\": \"...\" } }`."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Events"
+    },
+    {
+      "name": "Bookings"
+    },
+    {
+      "name": "Waitlist"
+    },
+    {
+      "name": "System"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check",
+        "operationId": "health",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The server is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/signup": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create an account",
+        "operationId": "signup",
+        "security": [],
+        "description": "Makes an attendee (or the role given). The password is stored hashed and never returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "A token and the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The email is already used. Possible codes: `EMAIL_TAKEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log in",
+        "operationId": "login",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A token and the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong email or password (same answer for both). Possible codes: `INVALID_CREDENTIALS`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Who am I",
+        "operationId": "me",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The logged-in user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Create an event (organizer only)",
+        "operationId": "createEvent",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "description": "Creates a draft owned by the caller. (S02)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "$ref": "#/components/schemas/EventSummary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Search published events",
+        "operationId": "searchEvents",
+        "security": [],
+        "description": "Search, filter and sort published events. Every parameter is optional. (S05)",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "city",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "maxPriceCents",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "onlyAvailable",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "date",
+                "price",
+                "availability"
+              ],
+              "default": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "View a published event",
+        "operationId": "getEvent",
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Published events only, with each tier and its seats left. A draft gives NOT_FOUND.",
+        "responses": {
+          "200": {
+            "description": "The event and its tiers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "$ref": "#/components/schemas/EventSummary"
+                    },
+                    "tiers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Tier"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}/tiers": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Add a ticket tier (event owner only)",
+        "operationId": "addTier",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTier"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new tier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tier": {
+                      "$ref": "#/components/schemas/Tier"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}/publish": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Publish an event (owner only)",
+        "operationId": "publishEvent",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The published event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "$ref": "#/components/schemas/EventSummary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The event has no tiers. Possible codes: `INVALID_STATE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}/unpublish": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Unpublish an event (owner only)",
+        "operationId": "unpublishEvent",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event, now a draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "event": {
+                      "$ref": "#/components/schemas/EventSummary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bookings": {
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "My bookings",
+        "operationId": "listMyBookings",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "description": "Only your own bookings.",
+        "responses": {
+          "200": {
+            "description": "Your bookings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bookings": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Booking"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Book tickets",
+        "operationId": "book",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "description": "Holds seats. The booking starts as pending and expires if not paid in time. (S06)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewBooking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The pending booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "booking": {
+                      "$ref": "#/components/schemas/Booking"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not enough seats, or the event is not on sale. Possible codes: `SOLD_OUT`, `INVALID_STATE`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bookings/{reference}/pay": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Pay for a booking (mock card)",
+        "operationId": "pay",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "description": "`tok_success` pays. `tok_declined` gives 402 and the booking stays pending. Paying twice never charges twice. (S07)",
+        "parameters": [
+          {
+            "name": "reference",
+            "in": "path",
+            "required": true,
+            "description": "Booking reference, for example `A4WMMBBT`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "paymentToken"
+                ],
+                "properties": {
+                  "paymentToken": {
+                    "type": "string",
+                    "enum": [
+                      "tok_success",
+                      "tok_declined"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The paid booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "booking": {
+                      "$ref": "#/components/schemas/Booking"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The mock card was declined. Possible codes: `PAYMENT_DECLINED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already paid, cancelled, or the hold expired. Possible codes: `INVALID_TRANSITION`, `BOOKING_EXPIRED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bookings/{reference}/refund-preview": {
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Show the refund before cancelling",
+        "operationId": "refundPreview",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "description": "100% refund 7 or more days before the event, 50% from 2 days up to 7 days, 0% under 2 days.",
+        "parameters": [
+          {
+            "name": "reference",
+            "in": "path",
+            "required": true,
+            "description": "Booking reference, for example `A4WMMBBT`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What a cancel would refund.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "preview": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bookings/{reference}/cancel": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Cancel a booking",
+        "operationId": "cancel",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "description": "A pending booking gives its seats back. A paid booking is refunded by the refund rule. After the event has started it is refused.",
+        "parameters": [
+          {
+            "name": "reference",
+            "in": "path",
+            "required": true,
+            "description": "Booking reference, for example `A4WMMBBT`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The booking after cancelling.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "booking": {
+                      "$ref": "#/components/schemas/Booking"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already cancelled, or the event has started. Possible codes: `INVALID_TRANSITION`, `EVENT_STARTED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/waitlist": {
+      "post": {
+        "tags": [
+          "Waitlist"
+        ],
+        "summary": "Join the waitlist of a sold-out tier",
+        "operationId": "joinWaitlist",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tierId",
+                  "quantity"
+                ],
+                "properties": {
+                  "tierId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your place in the line.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is missing or wrong. Possible codes: `VALIDATION`, `BAD_JSON`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The tier still has seats, or you are already in line. Possible codes: `NOT_SOLD_OUT`, `ALREADY_ON_WAITLIST`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/waitlist/mine": {
+      "get": {
+        "tags": [
+          "Waitlist"
+        ],
+        "summary": "My waitlist entries",
+        "operationId": "myWaitlist",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/waitlist/{id}/accept": {
+      "post": {
+        "tags": [
+          "Waitlist"
+        ],
+        "summary": "Accept a seat offer",
+        "operationId": "acceptOffer",
+        "security": [
+          {
+            "BearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "A pending booking for the offered seats.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "booking": {
+                      "$ref": "#/components/schemas/Booking"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token, or a bad or expired token. Possible codes: `UNAUTHENTICATED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your role or ownership does not allow this. Possible codes: `FORBIDDEN`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "It does not exist. Possible codes: `NOT_FOUND`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The offer has expired. Possible codes: `OFFER_EXPIRED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The token from signup or login."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "SOLD_OUT"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Credentials": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "att2@gmail.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "attendee",
+              "organizer",
+              "staff"
+            ]
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "attendee",
+              "organizer",
+              "staff"
+            ]
+          }
+        }
+      },
+      "AuthResult": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "NewEvent": {
+        "type": "object",
+        "required": [
+          "title",
+          "city",
+          "startsAt"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Fit night"
+          },
+          "city": {
+            "type": "string",
+            "example": "Lagos"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2027-12-05T17:00:00Z"
+          }
+        }
+      },
+      "EventSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          }
+        }
+      },
+      "NewTier": {
+        "type": "object",
+        "required": [
+          "name",
+          "priceCents",
+          "capacity"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Regular"
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 500000
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 100
+          }
+        }
+      },
+      "Tier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "priceCents": {
+            "type": "integer"
+          },
+          "capacity": {
+            "type": "integer"
+          },
+          "sold": {
+            "type": "integer"
+          },
+          "seatsLeft": {
+            "type": "integer"
+          }
+        }
+      },
+      "NewBooking": {
+        "type": "object",
+        "required": [
+          "tierId",
+          "quantity"
+        ],
+        "properties": {
+          "tierId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        }
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "example": "A4WMMBBT"
+          },
+          "tierId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid",
+              "cancelled",
+              "refunded",
+              "checked_in"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

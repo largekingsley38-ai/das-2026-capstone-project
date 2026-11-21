@@ -15,6 +15,7 @@ import { createAuthService } from '../services/authService.js';
 import { randomBytes } from 'node:crypto';
 import { createClock } from '../lib/clock.js';
 import { config } from '../config.js';
+import { openApiDocument } from './openapi.js';
 
 // Kept here so older imports of readJsonBody still work.
 export { readJsonBody } from './body.js';
@@ -101,6 +102,7 @@ export function createApp({
   const router = createRouter();
 
   router.get('/health', () => ({ status: 200, body: { status: 'ok' } }));
+  router.get('/openapi.json', () => ({ status: 200, body: openApiDocument }));
 
   const eventService = createEventService(repository);
   const waitlistService = createWaitlistService(repository, clock);
