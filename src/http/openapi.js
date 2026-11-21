@@ -120,9 +120,9 @@ export const openApiDocument = {
     },
     '/api/bookings/{reference}/pay': {
       post: op('Bookings', 'Pay for a booking (mock card)', 'pay', {
-        description: '`tok_success` pays. `tok_declined` gives 402 and the booking stays pending. Paying twice never charges twice. (S07)',
+        description: 'Send `{ "decline": true }` to simulate a declined card: you get 402 and the booking stays pending. Send `{}` to pay. Paying twice never charges twice. (S07)',
         parameters: [referenceParam],
-        requestBody: { required: true, ...json({ type: 'object', required: ['paymentToken'], properties: { paymentToken: { type: 'string', enum: ['tok_success', 'tok_declined'] } } }) },
+        requestBody: { required: true, ...json({ type: 'object', properties: { decline: { type: 'boolean', description: 'true simulates a declined card.' } } }) },
         responses: { 200: { description: 'The paid booking.', ...json(wrap('booking', ref('Booking'))) }, 400: errors.validation, 401: errors.unauthenticated, 402: errorResponse('The mock card was declined.', ['PAYMENT_DECLINED']), 403: errors.forbidden, 404: errors.notFound, 409: errorResponse('Already paid, cancelled, or the hold expired.', ['INVALID_TRANSITION', 'BOOKING_EXPIRED']) },
       }),
     },
