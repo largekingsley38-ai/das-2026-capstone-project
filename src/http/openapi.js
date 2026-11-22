@@ -142,7 +142,7 @@ export const openApiDocument = {
     },
     '/api/waitlist': {
       post: op('Waitlist', 'Join the waitlist of a sold-out tier', 'joinWaitlist', {
-        requestBody: { required: true, ...json({ type: 'object', required: ['tierId', 'quantity'], properties: { tierId: { type: 'string' }, quantity: { type: 'integer', minimum: 1 } } }) },
+        requestBody: { required: true, ...json({ type: 'object', required: ['tierId', 'quantity'], properties: { tierId: { type: 'string' }, quantity: { type: 'integer', minimum: 1, maximum: 10 } } }) },
         responses: { 201: { description: 'Your place in the line.', ...json(wrap('entry', { type: 'object' })) }, 400: errors.validation, 401: errors.unauthenticated, 409: errorResponse('The tier still has seats, or you are already in line.', ['NOT_SOLD_OUT', 'ALREADY_ON_WAITLIST']) },
       }),
     },
@@ -152,7 +152,7 @@ export const openApiDocument = {
     '/api/waitlist/{id}/accept': {
       post: op('Waitlist', 'Accept a seat offer', 'acceptOffer', {
         parameters: [idParam],
-        responses: { 201: { description: 'A pending booking for the offered seats.', ...json(wrap('booking', ref('Booking'))) }, 401: errors.unauthenticated, 403: errors.forbidden, 404: errors.notFound, 409: errorResponse('The offer has expired.', ['OFFER_EXPIRED']) },
+        responses: { 201: { description: 'A pending booking for the offered seats.', ...json(wrap('booking', ref('Booking'))) }, 401: errors.unauthenticated, 403: errors.forbidden, 404: errors.notFound, 409: errorResponse('The offer has expired, or there is no open offer.', ['OFFER_EXPIRED', 'INVALID_STATE']) },
       }),
     },
   },
