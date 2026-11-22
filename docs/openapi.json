@@ -797,7 +797,7 @@
             "BearerToken": []
           }
         ],
-        "description": "`tok_success` pays. `tok_declined` gives 402 and the booking stays pending. Paying twice never charges twice. (S07)",
+        "description": "Send `{ \"decline\": true }` to simulate a declined card: you get 402 and the booking stays pending. Send `{}` to pay. Paying twice never charges twice. (S07)",
         "parameters": [
           {
             "name": "reference",
@@ -815,16 +815,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "paymentToken"
-                ],
                 "properties": {
-                  "paymentToken": {
-                    "type": "string",
-                    "enum": [
-                      "tok_success",
-                      "tok_declined"
-                    ]
+                  "decline": {
+                    "type": "boolean",
+                    "description": "true simulates a declined card."
                   }
                 }
               }
