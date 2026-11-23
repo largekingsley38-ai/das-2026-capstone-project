@@ -118,6 +118,13 @@ export const openApiDocument = {
         responses: { 201: { description: 'The pending booking.', ...json(wrap('booking', ref('Booking'))) }, 400: errors.validation, 401: errors.unauthenticated, 404: errors.notFound, 409: errorResponse('Not enough seats, or the event is not on sale.', ['SOLD_OUT', 'INVALID_STATE']) },
       }),
     },
+    '/api/bookings/{reference}': {
+      get: op('Bookings', 'View one of my bookings', 'getMyBooking', {
+        description: 'Only the person who made the booking can read it. Anyone else gets FORBIDDEN.',
+        parameters: [referenceParam],
+        responses: { 200: { description: 'The booking.', ...json(wrap('booking', ref('Booking'))) }, 401: errors.unauthenticated, 403: errors.forbidden, 404: errors.notFound },
+      }),
+    },
     '/api/bookings/{reference}/pay': {
       post: op('Bookings', 'Pay for a booking (mock card)', 'pay', {
         description: 'Send `{ "decline": true }` to simulate a declined card: you get 402 and the booking stays pending. Send `{}` to pay. Paying twice never charges twice. (S07)',

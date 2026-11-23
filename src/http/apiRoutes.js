@@ -39,6 +39,11 @@ export function registerApiRoutes(router, { eventService, bookingService, waitli
     return { body: { bookings: await bookingService.listMine(callerId(req)) } };
   });
 
+  router.get('/api/bookings/:reference', async ({ req, params }) => {
+    const booking = await bookingService.getMine(callerId(req), params.reference);
+    return { body: { booking } };
+  });
+
   router.post('/api/events', async ({ req }) => {
     const body = await readJsonBody(req);
     const event = await eventService.createEvent(requireRole(req, 'organizer'), body);

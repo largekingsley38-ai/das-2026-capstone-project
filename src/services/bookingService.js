@@ -179,5 +179,9 @@ export function createBookingService(
     return repository.listBookingsForUser(requireUser(userId));
   }
 
-  return { bookTickets, payBooking, cancelBooking, previewRefund, listMine };
+  async function getMine(userId, reference) {
+    return mustGetOwnBooking(requireUser(userId), reference);
+  }
+
+  return { bookTickets, payBooking, cancelBooking, previewRefund, listMine, getMine };
 }

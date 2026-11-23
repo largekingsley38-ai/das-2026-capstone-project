@@ -216,3 +216,24 @@ test('the booking list only has your own bookings', async () => {
     close();
   }
 });
+test('an attendee can read their own booking but not another attendee\'s', async () => {
+  const { call, signup, close } = await start();
+  try {
+    const org = await signup('org@example.com', 'organizer');
+    const ada = await signup('ada@example.com');
+    const bob = await signup('bob@example.com');
+    const { tierId } = await publishedEvent(call, org);
+    const booked = await call('POST', '/api/bookings', { token: ada, body: { tierId, quantity: 1 } });
+    const ref = booked.json.booking.reference;
+
+    const own = await call('GET', `/api/bookings/${ref}`, { token: ada });
+    assert.equal(own.status, 200);
+    assert.equal(own.json.booking.reference, ref);
+
+    const other = await call('GET', `/api/bookings/${ref}`, { token: bob });
+    assert.equal(other.status, 403);
+    assert.equal(other.json.error.code, 'FORBIDDEN');
+  } finally {
+    close();
+  }
+});

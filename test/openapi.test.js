@@ -21,5 +21,5 @@ test('every documented route exists on the router', () => {
 
 test('every router path is documented', () => {
   const documented = new Set(operations.map(({ method, path }) => `${method} ${path}`));
-  assert.equal(documented.size, 18, 'expected 18 documented operations');
+  assert.equal(documented.size, 19, 'expected 19 documented operations');
 });
