@@ -135,3 +135,24 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 - The brief says another person's booking should give NOT_FOUND. My code gives FORBIDDEN. I must ask the instructor which one he wants.
 - Still to check in the browser: event.html with a logged-out user (should go to login) and a paid booking showing Status: paid on tickets.html.
 - Some earlier files in this project were written by AI. I should say that clearly in this log.
+
+## Build 7 and 8 final notes
+
+### Differences from the briefs (checked at the end)
+- **FORBIDDEN or NOT_FOUND.** The Build 7 brief contradicts itself. Story S13 says another person's booking gives FORBIDDEN, but the Build 7 prompt says NOT_FOUND. I followed S13 (FORBIDDEN) and will ask my instructor which one he grades. I have not had an answer yet.
+- **Reading one booking.** The brief wanted a test where an attendee reads another attendee's booking, but my server had no route to read one booking. I added GET /api/bookings/:reference (PR #15) and a test: the owner gets 200 and another attendee gets 403.
+- **File names.** The Build 7 prompt names src/routes/auth.js and src/http/guards.js. In my project the auth routes and the role check are in src/http/apiRoutes.js. The Build 8 prompt names src/services/seatService.js. In my project that behaviour is in waitlistService.js and bookingService.js. The behaviour is the same, so I did not move the code.
+- **Cancelled or refunded.** A cancelled paid booking ends as refunded, because the state machine has that state. I will ask my instructor whether he wants cancelled.
+
+### What I added to close gaps
+- Tests for the refund-preview route and the waitlist routes (PR #16). Before this they were only tested by hand in the browser.
+- A before and after run in scripts/oversell-demo.js (PR #14): 50 bookings for 1 seat with the old code, then 1 booking and 49 SOLD_OUT with the atomic UPDATE.
+
+### What the AI got wrong while I was checking
+- The pay body in the API docs was a guess (paymentToken). My server takes { decline: true } or {}. I found it by reading the code, fixed src/http/openapi.js and regenerated docs/openapi.json.
+- A pasted patch ran twice and doubled one import line, one route line and one package.json script. I found it with grep, deleted the second copies, and checked with node --check and npm test.
+- The AI said the Build 7 brief wanted NOT_FOUND, without reading story S13. I read the brief again and found the contradiction.
+
+### Still open
+- docs/debugging-exercise.md for Build 8 has not been given to me yet. I have asked my classmates and will ask my instructor.
+- public/js/qr.js for Build 9 is missing.
